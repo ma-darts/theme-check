@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>テーマ・エフェクト管理</title>
+<style>
+body { font-family: sans-serif; padding: 10px; }
+h1 { font-size: 20px; }
+
+/* ボタン */
+button {
+  margin: 5px;
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+}
+
+/* 画像カード */
+.card {
+  border: 1px solid #ccc;
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+/* トグル */
+.theme { background: #4CAF50; color: white; }
+.effect { background: #2196F3; color: white; }
+
+/* 削除 */
+.delete { background: red; color: white; }
+
+/* フィルター */
+.filter {
+  margin-bottom: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>テーマ・エフェクト管理</h1>
+
+<!-- フィルター -->
+<div class="filter">
+  年度:
+  <select id="yearFilter" onchange="render()">
+    <option value="all">すべて</option>
+  </select>
+
+  種類:
+  <select id="typeFilter" onchange="render()">
+    <option value="all">すべて</option>
+    <option>プレイヤー</option>
+    <option>メーカー</option>
+    <option>その他</option>
+  </select>
+</div>
+
+<!-- 追加 -->
+<h3>画像追加</h3>
+<input type="file" id="fileInput"><br>
+年度:
+<input type="text" id="yearInput" placeholder="例: 2024"><br>
+種類:
+<select id="typeInput">
+  <option>プレイヤー</option>
+  <option>メーカー</option>
+  <option>その他</option>
+</select><br>
+<button onclick="addImage()">追加</button>
+
+<hr>
+
+<!-- 初期データ追加 -->
+<button onclick="addInitial()">初期データ追加読み込み</button>
+
+<hr>
+
+<div id="list"></div>
+
+<script>
+let data = JSON.parse(localStorage.getItem("stampData") || "[]");
+
+function save() {
+  localStorage.setItem("stampData", JSON.stringify(data));
+}
+
+function addImage() {
+  const file = document.getElementById("fileInput").files[0];
+  const year = document.getElementById("yearInput").value;
+  const type = document.getElementById("typeInput").value;
+
+  if (!file || !year) {
+    alert("画像と年度は必須！");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    data.push({
+      img: e.target.result,
+      theme: false,
+      effect: false,
+      year: year,
+      type: type
+    });
+    save();
+    render();
+  };
+  reader.readAsDataURL(file);
+}
+
+function toggle(i, key) {
+  data[i][key] = !data[i][key];
+  save();
+  render();
+}
+
+function deleteItem(i) {
+  if (!confirm("削除する？")) return;
+  data.splice(i, 1);
+  save();
+  render();
+}
+
+function addInitial() {
+  const initialData = [
+    // 👇ここに配布データ入れる
+  ];
+
+  data = data.concat(initialData);
+  save();
+  render();
+}
+
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  const yearFilter = document.getElementById("yearFilter").value;
+  const typeFilter = document.getElementById("typeFilter").value;
+
+  // 年度フィルター更新
+  const years = [...new Set(data.map(d => d.year))];
+  const yearSelect = document.getElementById("yearFilter");
+  yearSelect.innerHTML = '<option value="all">すべて</option>' +
+    years.map(y => `<option ${y==yearFilter?"selected":""}>${y}</option>`).join("");
+
+  data.forEach((item, i) => {
+
+    if (yearFilter !== "all" && item.year !== yearFilter) return;
+    if (typeFilter !== "all" && item.type !== typeFilter) return;
+
+    const div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <img src="${item.img}">
+      <p>${item.year} / ${item.type}</p>
+
+      <button class="theme" onclick="toggle(${i}, 'theme')">
+        テーマ(Live2): ${item.theme ? "✔" : "未"}
+      </button>
+
+      <button class="effect" onclick="toggle(${i}, 'effect')">
+        エフェクト(Live3): ${item.effect ? "✔" : "未"}
+      </button>
+
+      <button class="delete" onclick="deleteItem(${i})">削除</button>
+    `;
+
+    list.appendChild(div);
+  });
+}
+
+render();
+</script>
+
+</body>
+</html>
