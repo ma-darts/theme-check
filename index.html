@@ -2,181 +2,176 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>テーマ・エフェクト管理</title>
+<title>画像管理アプリ</title>
 <style>
 body { font-family: sans-serif; padding: 10px; }
 h1 { font-size: 20px; }
 
-/* ボタン */
-button {
-  margin: 5px;
-  padding: 8px;
-  border-radius: 8px;
-  border: none;
-}
+.controls { margin-bottom: 10px; }
 
-/* 画像カード */
 .card {
   border: 1px solid #ccc;
-  margin: 10px 0;
-  padding: 10px;
-  border-radius: 10px;
+  padding: 8px;
+  margin: 5px;
+  display: inline-block;
+  width: 150px;
+  vertical-align: top;
 }
 
 img {
-  max-width: 100%;
-  border-radius: 8px;
+  width: 100%;
 }
 
-/* トグル */
-.theme { background: #4CAF50; color: white; }
-.effect { background: #2196F3; color: white; }
+button {
+  margin-top: 5px;
+  width: 100%;
+}
 
-/* 削除 */
-.delete { background: red; color: white; }
-
-/* フィルター */
-.filter {
-  margin-bottom: 10px;
+.active {
+  background: #4caf50;
+  color: white;
 }
 </style>
 </head>
 
 <body>
 
-<h1>テーマ・エフェクト管理</h1>
+<h1>画像管理アプリ</h1>
 
-<!-- フィルター -->
-<div class="filter">
-  年度:
-  <select id="yearFilter" onchange="render()">
-    <option value="all">すべて</option>
+<div class="controls">
+  <input type="file" id="file">
+  <input type="text" id="year" placeholder="年度">
+  <select id="type">
+    <option value="player">プレイヤー</option>
+    <option value="maker">メーカー</option>
+    <option value="other">その他</option>
   </select>
-
-  種類:
-  <select id="typeFilter" onchange="render()">
-    <option value="all">すべて</option>
-    <option>プレイヤー</option>
-    <option>メーカー</option>
-    <option>その他</option>
-  </select>
+  <button onclick="addImage()">追加</button>
 </div>
 
-<!-- 追加 -->
-<h3>画像追加</h3>
-<input type="file" id="fileInput"><br>
-年度:
-<input type="text" id="yearInput" placeholder="例: 2024"><br>
-種類:
-<select id="typeInput">
-  <option>プレイヤー</option>
-  <option>メーカー</option>
-  <option>その他</option>
-</select><br>
-<button onclick="addImage()">追加</button>
+<div class="controls">
+  <input type="text" id="filterYear" placeholder="年度フィルター">
+  <select id="filterType">
+    <option value="">種類すべて</option>
+    <option value="player">プレイヤー</option>
+    <option value="maker">メーカー</option>
+    <option value="other">その他</option>
+  </select>
+  <button onclick="render()">フィルター適用</button>
+</div>
 
-<hr>
-
-<!-- 初期データ追加 -->
-<button onclick="addInitial()">初期データ追加読み込み</button>
-
-<hr>
+<div class="controls">
+  <button onclick="loadInitialData()">初期データ読み込み</button>
+</div>
 
 <div id="list"></div>
 
 <script>
-let data = JSON.parse(localStorage.getItem("stampData") || "[]");
+function getData() {
+  return JSON.parse(localStorage.getItem('images') || '[]');
+}
 
-function save() {
-  localStorage.setItem("stampData", JSON.stringify(data));
+function saveData(data) {
+  localStorage.setItem('images', JSON.stringify(data));
+}
+
+function generateId() {
+  return Date.now().toString();
 }
 
 function addImage() {
-  const file = document.getElementById("fileInput").files[0];
-  const year = document.getElementById("yearInput").value;
-  const type = document.getElementById("typeInput").value;
+  const file = document.getElementById('file').files[0];
+  const year = document.getElementById('year').value;
+  const type = document.getElementById('type').value;
 
   if (!file || !year) {
-    alert("画像と年度は必須！");
+    alert('画像と年度を入力');
     return;
   }
 
   const reader = new FileReader();
   reader.onload = function(e) {
+    const data = getData();
+
     data.push({
-      img: e.target.result,
+      id: generateId(),
+      image: e.target.result,
+      year,
+      type,
       theme: false,
-      effect: false,
-      year: year,
-      type: type
+      effect: false
     });
-    save();
+
+    saveData(data);
     render();
   };
   reader.readAsDataURL(file);
 }
 
-function toggle(i, key) {
-  data[i][key] = !data[i][key];
-  save();
+function toggle(id, key) {
+  const data = getData();
+  const item = data.find(d => d.id === id);
+  item[key] = !item[key];
+  saveData(data);
   render();
 }
 
-function deleteItem(i) {
-  if (!confirm("削除する？")) return;
-  data.splice(i, 1);
-  save();
-  render();
-}
-
-function addInitial() {
-  const initialData = [
-    // 👇ここに配布データ入れる
-  ];
-
-  data = data.concat(initialData);
-  save();
+function removeItem(id) {
+  let data = getData();
+  data = data.filter(d => d.id !== id);
+  saveData(data);
   render();
 }
 
 function render() {
-  const list = document.getElementById("list");
-  list.innerHTML = "";
+  const list = document.getElementById('list');
+  const data = getData();
 
-  const yearFilter = document.getElementById("yearFilter").value;
-  const typeFilter = document.getElementById("typeFilter").value;
+  const filterYear = document.getElementById('filterYear').value;
+  const filterType = document.getElementById('filterType').value;
 
-  // 年度フィルター更新
-  const years = [...new Set(data.map(d => d.year))];
-  const yearSelect = document.getElementById("yearFilter");
-  yearSelect.innerHTML = '<option value="all">すべて</option>' +
-    years.map(y => `<option ${y==yearFilter?"selected":""}>${y}</option>`).join("");
+  const filtered = data.filter(d => {
+    return (!filterYear || d.year.includes(filterYear)) &&
+           (!filterType || d.type === filterType);
+  });
 
-  data.forEach((item, i) => {
+  list.innerHTML = '';
 
-    if (yearFilter !== "all" && item.year !== yearFilter) return;
-    if (typeFilter !== "all" && item.type !== typeFilter) return;
-
-    const div = document.createElement("div");
-    div.className = "card";
+  filtered.forEach(d => {
+    const div = document.createElement('div');
+    div.className = 'card';
 
     div.innerHTML = `
-      <img src="${item.img}">
-      <p>${item.year} / ${item.type}</p>
-
-      <button class="theme" onclick="toggle(${i}, 'theme')">
-        テーマ(Live2): ${item.theme ? "✔" : "未"}
-      </button>
-
-      <button class="effect" onclick="toggle(${i}, 'effect')">
-        エフェクト(Live3): ${item.effect ? "✔" : "未"}
-      </button>
-
-      <button class="delete" onclick="deleteItem(${i})">削除</button>
+      <img src="${d.image}">
+      <div>${d.year} / ${d.type}</div>
+      <button class="${d.theme ? 'active' : ''}" onclick="toggle('${d.id}','theme')">テーマ</button>
+      <button class="${d.effect ? 'active' : ''}" onclick="toggle('${d.id}','effect')">エフェクト</button>
+      <button onclick="removeItem('${d.id}')">削除</button>
     `;
 
     list.appendChild(div);
   });
+}
+
+async function loadInitialData() {
+  try {
+    const res = await fetch('data.json');
+    const newData = await res.json();
+
+    const saved = getData();
+
+    const merged = [
+      ...saved,
+      ...newData.filter(n => !saved.some(s => s.id === n.id))
+    ];
+
+    saveData(merged);
+    render();
+
+    alert('初期データ読み込み完了');
+  } catch (e) {
+    alert('読み込み失敗');
+  }
 }
 
 render();
