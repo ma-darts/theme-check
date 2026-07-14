@@ -2,12 +2,20 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>コレクション管理</title>
+<title>テーマ・エフェクト管理</title>
 
 <style>
 body {
   font-family: sans-serif;
   padding: 10px;
+}
+
+/* 通知 */
+.notice {
+  background: #ffeb3b;
+  padding: 5px;
+  margin-bottom: 10px;
+  display: none;
 }
 
 /* フィルター */
@@ -28,7 +36,6 @@ body {
   height: 100%;
   background: #4caf50;
   width: 0%;
-  transition: width 0.3s;
 }
 
 .progress span {
@@ -50,23 +57,26 @@ body {
 }
 
 .item {
-  width: 80px;
+  width: 90px;
   text-align: center;
-  cursor: pointer;
+  font-size: 11px;
 }
 
 .item img {
   width: 100%;
-  border: 2px solid transparent;
 }
 
-.item.got img {
-  border-color: green;
-  opacity: 1;
+/* ボタン */
+.btn {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  cursor: pointer;
 }
 
-.item:not(.got) img {
-  opacity: 0.3;
+.got {
+  background: #4caf50;
+  color: white;
 }
 
 /* モーダル */
@@ -103,45 +113,36 @@ body {
 #missingList li:hover {
   background: #eee;
 }
-
-/* 通知 */
-.notice {
-  background: #ffeb3b;
-  padding: 5px;
-  margin-bottom: 10px;
-  display: none;
-}
 </style>
 </head>
 
 <body>
 
-<h2>コレクション管理</h2>
+<h2>テーマ・エフェクト管理</h2>
 
-<div class="notice" id="notice"></div>
+<div id="notice" class="notice"></div>
 
-<!-- フィルター -->
 <div class="filter">
   <button onclick="setFilter('all')">全体</button>
-  <button onclick="setFilter('テーマ')">テーマ</button>
-  <button onclick="setFilter('エフェクト')">エフェクト</button>
+  <button onclick="setFilter('theme')">テーマ</button>
+  <button onclick="setFilter('effect')">エフェクト</button>
 </div>
 
-<!-- テーマ -->
+<!-- テーマ進捗 -->
 <h3>テーマ</h3>
-<div class="progress" onclick="showMissing('テーマ')">
+<div class="progress" onclick="showMissing('theme')">
   <div class="bar" id="bar_theme"></div>
   <span id="text_theme"></span>
 </div>
-<div class="grid" id="themeList"></div>
 
-<!-- エフェクト -->
+<!-- エフェクト進捗 -->
 <h3>エフェクト</h3>
-<div class="progress" onclick="showMissing('エフェクト')">
+<div class="progress" onclick="showMissing('effect')">
   <div class="bar" id="bar_effect"></div>
   <span id="text_effect"></span>
 </div>
-<div class="grid" id="effectList"></div>
+
+<div class="grid" id="list"></div>
 
 <!-- モーダル -->
 <div id="modal" class="modal hidden">
@@ -153,25 +154,12 @@ body {
 </div>
 
 <script>
-/* ===== データ ===== */
+/* ===== データ（共通画像） ===== */
 const data = [
-  {
-    name: 'テーマ',
-    items: [
-      { name: 'theme1', img: 'theme1.png' },
-      { name: 'theme2', img: 'theme2.png' }
-    ]
-  },
-  {
-    name: 'エフェクト',
-    items: [
-      { name: 'effect1', img: 'effect1.png' },
-      { name: 'effect2', img: 'effect2.png' }
-    ]
-  }
+  { name: 'item1', img: 'item1.png', theme: false, effect: false },
+  { name: 'item2', img: 'item2.png', theme: false, effect: false }
 ];
 
-/* ===== 状態 ===== */
 let filter = 'all';
 
 /* ===== 保存 ===== */
@@ -183,10 +171,9 @@ function load() {
   const saved = localStorage.getItem('collection');
   if (saved) {
     const parsed = JSON.parse(saved);
-    parsed.forEach((cat, i) => {
-      cat.items.forEach((item, j) => {
-        data[i].items[j].got = item.got;
-      });
+    parsed.forEach((item, i) => {
+      data[i].theme = item.theme;
+      data[i].effect = item.effect;
     });
   }
 }
@@ -197,62 +184,70 @@ function checkUpdate() {
   if (!saved) return;
 
   const old = JSON.parse(saved);
-  let newCount = 0;
-
-  data.forEach((cat, i) => {
-    cat.items.forEach((item, j) => {
-      if (!old[i] || !old[i].items[j]) newCount++;
-    });
-  });
-
-  if (newCount > 0) {
+  if (data.length > old.length) {
     const notice = document.getElementById('notice');
     notice.style.display = 'block';
-    notice.textContent = `新アイテム追加: ${newCount}件`;
+    notice.textContent = `新規追加: ${data.length - old.length}件`;
   }
 }
 
 /* ===== 描画 ===== */
 function render() {
-  renderCategory('テーマ', 'themeList', 'bar_theme', 'text_theme');
-  renderCategory('エフェクト', 'effectList', 'bar_effect', 'text_effect');
-  save();
-}
-
-function renderCategory(name, listId, barId, textId) {
-  const category = data.find(c => c.name === name);
-  const list = document.getElementById(listId);
+  const list = document.getElementById('list');
   list.innerHTML = '';
 
-  let done = 0;
+  let themeDone = 0;
+  let effectDone = 0;
 
-  category.items.forEach(item => {
-    if (item.got) done++;
+  data.forEach(item => {
+    if (item.theme) themeDone++;
+    if (item.effect) effectDone++;
 
-    // フィルター（未取得なら絶対表示）
-    if (filter !== 'all' && name !== filter && item.got) return;
+    // フィルター（どちらか未取得なら表示）
+    if (filter === 'theme' && item.theme) return;
+    if (filter === 'effect' && item.effect) return;
 
     const div = document.createElement('div');
-    div.className = 'item ' + (item.got ? 'got' : '');
+    div.className = 'item';
 
     div.innerHTML = `
       <img src="${item.img}">
       <div>${item.name}</div>
+      <button class="btn ${item.theme ? 'got' : ''}">
+        テーマ
+      </button>
+      <button class="btn ${item.effect ? 'got' : ''}">
+        エフェクト
+      </button>
     `;
 
-    div.onclick = () => {
-      item.got = !item.got;
+    const btns = div.querySelectorAll('button');
+
+    btns[0].onclick = () => {
+      item.theme = !item.theme;
+      render();
+    };
+
+    btns[1].onclick = () => {
+      item.effect = !item.effect;
       render();
     };
 
     list.appendChild(div);
   });
 
-  const total = category.items.length;
-  const percent = total ? Math.floor(done / total * 100) : 0;
+  updateBar('theme', themeDone);
+  updateBar('effect', effectDone);
 
-  document.getElementById(barId).style.width = percent + '%';
-  document.getElementById(textId).textContent =
+  save();
+}
+
+function updateBar(type, done) {
+  const total = data.length;
+  const percent = Math.floor(done / total * 100);
+
+  document.getElementById('bar_' + type).style.width = percent + '%';
+  document.getElementById('text_' + type).textContent =
     `${done}/${total} (${percent}%)`;
 }
 
@@ -262,20 +257,18 @@ function setFilter(f) {
   render();
 }
 
-/* ===== 未取得表示 ===== */
+/* ===== 未取得 ===== */
 function showMissing(type) {
   const list = document.getElementById('missingList');
   list.innerHTML = '';
 
-  const category = data.find(c => c.name === type);
-
-  category.items.forEach(item => {
-    if (!item.got) {
+  data.forEach(item => {
+    if (!item[type]) {
       const li = document.createElement('li');
       li.textContent = item.name;
 
       li.onclick = () => {
-        item.got = true;
+        item[type] = true;
         render();
         showMissing(type);
       };
