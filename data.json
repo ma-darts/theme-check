@@ -2,6 +2,7 @@
   {
     "id": "2026_001",
     "image": "images/sample1.jpg",
+    "name": "サンプル画像①", ← ★これ追加
     "year": "2026",
     "type": "player",
     "theme": false,
