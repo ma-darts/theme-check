@@ -2,177 +2,302 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>画像管理</title>
+<title>コレクション管理</title>
 
 <style>
 body {
   font-family: sans-serif;
-  margin: 0;
   padding: 10px;
-  max-width: 480px;
-  margin-inline: auto;
 }
 
-h1 {
-  font-size: 18px;
-  text-align: center;
+/* フィルター */
+.filter button {
+  margin-right: 5px;
 }
 
 /* 進捗バー */
 .progress {
-  height: 14px;
+  position: relative;
+  height: 16px;
   background: #eee;
   margin: 10px 0;
+  cursor: pointer;
 }
 
 .bar {
   height: 100%;
   background: #4caf50;
   width: 0%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 10px;
   transition: width 0.3s;
+}
+
+.progress span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: bold;
+  color: #000;
+  text-shadow: 0 0 2px #fff;
 }
 
 /* グリッド */
 .grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.card {
-  border: 1px solid #ccc;
-  padding: 5px;
+.item {
+  width: 80px;
   text-align: center;
+  cursor: pointer;
 }
 
-img {
+.item img {
   width: 100%;
-  height: auto;
+  border: 2px solid transparent;
 }
 
-button {
+.item.got img {
+  border-color: green;
+  opacity: 1;
+}
+
+.item:not(.got) img {
+  opacity: 0.3;
+}
+
+/* モーダル */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
-  margin-top: 4px;
-  font-size: 12px;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.active {
-  background: #4caf50;
-  color: white;
+.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  width: 300px;
+  max-height: 70%;
+  overflow-y: auto;
+  border-radius: 8px;
+}
+
+#missingList li {
+  cursor: pointer;
+  padding: 4px;
+}
+
+#missingList li:hover {
+  background: #eee;
+}
+
+/* 通知 */
+.notice {
+  background: #ffeb3b;
+  padding: 5px;
+  margin-bottom: 10px;
+  display: none;
 }
 </style>
 </head>
 
 <body>
 
-<h1>画像管理</h1>
+<h2>コレクション管理</h2>
 
-<!-- 進捗バー -->
-<div class="progress">
-  <div class="bar" id="bar">
-    <span id="progressText"></span>
+<div class="notice" id="notice"></div>
+
+<!-- フィルター -->
+<div class="filter">
+  <button onclick="setFilter('all')">全体</button>
+  <button onclick="setFilter('テーマ')">テーマ</button>
+  <button onclick="setFilter('エフェクト')">エフェクト</button>
+</div>
+
+<!-- テーマ -->
+<h3>テーマ</h3>
+<div class="progress" onclick="showMissing('テーマ')">
+  <div class="bar" id="bar_theme"></div>
+  <span id="text_theme"></span>
+</div>
+<div class="grid" id="themeList"></div>
+
+<!-- エフェクト -->
+<h3>エフェクト</h3>
+<div class="progress" onclick="showMissing('エフェクト')">
+  <div class="bar" id="bar_effect"></div>
+  <span id="text_effect"></span>
+</div>
+<div class="grid" id="effectList"></div>
+
+<!-- モーダル -->
+<div id="modal" class="modal hidden">
+  <div class="modal-content">
+    <h3>未取得</h3>
+    <ul id="missingList"></ul>
+    <button onclick="closeModal()">閉じる</button>
   </div>
 </div>
 
-<div id="list" class="grid"></div>
-
 <script>
-const ADMIN_MODE = false; // trueで管理機能ON
+/* ===== データ ===== */
+const data = [
+  {
+    name: 'テーマ',
+    items: [
+      { name: 'theme1', img: 'theme1.png' },
+      { name: 'theme2', img: 'theme2.png' }
+    ]
+  },
+  {
+    name: 'エフェクト',
+    items: [
+      { name: 'effect1', img: 'effect1.png' },
+      { name: 'effect2', img: 'effect2.png' }
+    ]
+  }
+];
 
-function getData() {
-  return JSON.parse(localStorage.getItem('images') || '[]');
+/* ===== 状態 ===== */
+let filter = 'all';
+
+/* ===== 保存 ===== */
+function save() {
+  localStorage.setItem('collection', JSON.stringify(data));
 }
 
-function saveData(data) {
-  localStorage.setItem('images', JSON.stringify(data));
-}
-
-/* 初期データ自動読み込み */
-async function loadInitialData() {
-  try {
-    const res = await fetch('data.json');
-    const newData = await res.json();
-
-    const saved = getData();
-
-    const merged = [
-      ...saved,
-      ...newData.filter(n => !saved.some(s => s.id === n.id))
-    ];
-
-    saveData(merged);
-    render();
-  } catch (e) {
-    console.log('初期データ読み込み失敗');
+function load() {
+  const saved = localStorage.getItem('collection');
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    parsed.forEach((cat, i) => {
+      cat.items.forEach((item, j) => {
+        data[i].items[j].got = item.got;
+      });
+    });
   }
 }
 
-/* トグル */
-function toggle(id, key) {
-  const data = getData();
-  const item = data.find(d => d.id === id);
-  item[key] = !item[key];
-  saveData(data);
-  render();
+/* ===== 更新通知 ===== */
+function checkUpdate() {
+  const saved = localStorage.getItem('collection');
+  if (!saved) return;
+
+  const old = JSON.parse(saved);
+  let newCount = 0;
+
+  data.forEach((cat, i) => {
+    cat.items.forEach((item, j) => {
+      if (!old[i] || !old[i].items[j]) newCount++;
+    });
+  });
+
+  if (newCount > 0) {
+    const notice = document.getElementById('notice');
+    notice.style.display = 'block';
+    notice.textContent = `新アイテム追加: ${newCount}件`;
+  }
 }
 
-/* 削除（管理者のみ） */
-function removeItem(id) {
-  if (!ADMIN_MODE) return;
-  let data = getData();
-  data = data.filter(d => d.id !== id);
-  saveData(data);
-  render();
-}
-
-/* 描画 */
+/* ===== 描画 ===== */
 function render() {
-  const list = document.getElementById('list');
-  const data = getData();
+  renderCategory('テーマ', 'themeList', 'bar_theme', 'text_theme');
+  renderCategory('エフェクト', 'effectList', 'bar_effect', 'text_effect');
+  save();
+}
 
+function renderCategory(name, listId, barId, textId) {
+  const category = data.find(c => c.name === name);
+  const list = document.getElementById(listId);
   list.innerHTML = '';
 
-  let total = data.length;
   let done = 0;
 
-  data.forEach(d => {
-    if (d.theme || d.effect) done++;
+  category.items.forEach(item => {
+    if (item.got) done++;
+
+    // フィルター（未取得なら絶対表示）
+    if (filter !== 'all' && name !== filter && item.got) return;
 
     const div = document.createElement('div');
-    div.className = 'card';
+    div.className = 'item ' + (item.got ? 'got' : '');
 
     div.innerHTML = `
-      <img src="${d.image}">
-      <div>${d.name || ''}</div>
-      <button class="${d.theme ? 'active' : ''}" onclick="toggle('${d.id}','theme')">テーマ</button>
-      <button class="${d.effect ? 'active' : ''}" onclick="toggle('${d.id}','effect')">エフェクト</button>
-      ${ADMIN_MODE ? `<button onclick="removeItem('${d.id}')">削除</button>` : ''}
+      <img src="${item.img}">
+      <div>${item.name}</div>
     `;
+
+    div.onclick = () => {
+      item.got = !item.got;
+      render();
+    };
 
     list.appendChild(div);
   });
 
-  /* 進捗更新 */
-  const percent = total ? Math.floor((done / total) * 100) : 0;
+  const total = category.items.length;
+  const percent = total ? Math.floor(done / total * 100) : 0;
 
-  const bar = document.getElementById('bar');
-  const text = document.getElementById('progressText');
-
-  bar.style.width = Math.max(percent, 5) + '%';
-  text.textContent = `${done}/${total} (${percent}%)`;
-
-  /* 100%で色変化 */
-  bar.style.background = percent === 100 ? '#2196f3' : '#4caf50';
+  document.getElementById(barId).style.width = percent + '%';
+  document.getElementById(textId).textContent =
+    `${done}/${total} (${percent}%)`;
 }
 
-/* 起動時 */
-loadInitialData();
+/* ===== フィルター ===== */
+function setFilter(f) {
+  filter = f;
+  render();
+}
+
+/* ===== 未取得表示 ===== */
+function showMissing(type) {
+  const list = document.getElementById('missingList');
+  list.innerHTML = '';
+
+  const category = data.find(c => c.name === type);
+
+  category.items.forEach(item => {
+    if (!item.got) {
+      const li = document.createElement('li');
+      li.textContent = item.name;
+
+      li.onclick = () => {
+        item.got = true;
+        render();
+        showMissing(type);
+      };
+
+      list.appendChild(li);
+    }
+  });
+
+  if (!list.innerHTML) {
+    list.innerHTML = '<li>全部取得済み！🎉</li>';
+  }
+
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+}
+
+/* ===== 初期化 ===== */
+load();
+checkUpdate();
 render();
 </script>
 
