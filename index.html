@@ -10,15 +10,38 @@ body {
   font-family: sans-serif;
   margin: 0;
   padding: 10px;
-  max-width: 480px; /* スマホ最適 */
+  max-width: 480px;
   margin-inline: auto;
 }
 
-h1 { font-size: 18px; text-align: center; }
+h1 {
+  font-size: 18px;
+  text-align: center;
+}
 
+/* 進捗バー */
+.progress {
+  height: 14px;
+  background: #eee;
+  margin: 10px 0;
+}
+
+.bar {
+  height: 100%;
+  background: #4caf50;
+  width: 0%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 10px;
+  transition: width 0.3s;
+}
+
+/* グリッド */
 .grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr); /* 横2列 */
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
 }
 
@@ -43,19 +66,6 @@ button {
   background: #4caf50;
   color: white;
 }
-
-/* 進捗バー */
-.progress {
-  height: 10px;
-  background: #eee;
-  margin: 10px 0;
-}
-
-.bar {
-  height: 100%;
-  background: #4caf50;
-  width: 0%;
-}
 </style>
 </head>
 
@@ -65,13 +75,15 @@ button {
 
 <!-- 進捗バー -->
 <div class="progress">
-  <div class="bar" id="bar"></div>
+  <div class="bar" id="bar">
+    <span id="progressText"></span>
+  </div>
 </div>
 
 <div id="list" class="grid"></div>
 
 <script>
-const ADMIN_MODE = false; // ← trueにすると管理UI出す
+const ADMIN_MODE = false; // trueで管理機能ON
 
 function getData() {
   return JSON.parse(localStorage.getItem('images') || '[]');
@@ -81,11 +93,7 @@ function saveData(data) {
   localStorage.setItem('images', JSON.stringify(data));
 }
 
-function generateId() {
-  return Date.now().toString();
-}
-
-/* 初期データ自動読み込み（重複防止） */
+/* 初期データ自動読み込み */
 async function loadInitialData() {
   try {
     const res = await fetch('data.json');
@@ -152,7 +160,15 @@ function render() {
 
   /* 進捗更新 */
   const percent = total ? Math.floor((done / total) * 100) : 0;
-  document.getElementById('bar').style.width = percent + '%';
+
+  const bar = document.getElementById('bar');
+  const text = document.getElementById('progressText');
+
+  bar.style.width = Math.max(percent, 5) + '%';
+  text.textContent = `${done}/${total} (${percent}%)`;
+
+  /* 100%で色変化 */
+  bar.style.background = percent === 100 ? '#2196f3' : '#4caf50';
 }
 
 /* 起動時 */
