@@ -18,7 +18,7 @@ body {
 }
 
 .filter button {
-  margin-right: 5px;
+  margin: 3px;
 }
 
 /* 進捗バー */
@@ -45,8 +45,6 @@ body {
   transform: translate(-50%, -50%);
   font-size: 11px;
   font-weight: bold;
-  color: #000;
-  text-shadow: 0 0 2px #fff;
 }
 
 /* グリッド */
@@ -59,12 +57,10 @@ body {
 .item {
   text-align: center;
   font-size: 12px;
-  padding: 5px;
 }
 
 .item img {
   width: 100%;
-  height: auto;
 }
 
 /* ボタン */
@@ -89,8 +85,8 @@ body {
   height: 100%;
   background: rgba(0,0,0,0.5);
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
 }
 
 .hidden {
@@ -101,18 +97,6 @@ body {
   background: white;
   padding: 20px;
   width: 300px;
-  max-height: 70%;
-  overflow-y: auto;
-  border-radius: 8px;
-}
-
-#missingList li {
-  cursor: pointer;
-  padding: 4px;
-}
-
-#missingList li:hover {
-  background: #eee;
 }
 </style>
 </head>
@@ -123,11 +107,15 @@ body {
 
 <div id="notice" class="notice"></div>
 
+<!-- 種類フィルター -->
 <div class="filter">
-  <button onclick="setFilter('all')">全体</button>
-  <button onclick="setFilter('theme')">テーマ</button>
-  <button onclick="setFilter('effect')">エフェクト</button>
+  <button onclick="setTypeFilter('all')">全体</button>
+  <button onclick="setTypeFilter('theme')">テーマ(Live2)</button>
+  <button onclick="setTypeFilter('effect')">エフェクト(Live3)</button>
 </div>
+
+<!-- 年度フィルター -->
+<div class="filter" id="yearFilter"></div>
 
 <h3>テーマ</h3>
 <div class="progress" onclick="showMissing('theme')">
@@ -153,12 +141,14 @@ body {
 
 <script>
 const data = [
-  { name: 'item1', img: 'item1.png', theme: false, effect: false },
-  { name: 'item2', img: 'item2.png', theme: false, effect: false }
+  { name: 'item1', img: 'item1.png', year: 2023, theme: false, effect: false },
+  { name: 'item2', img: 'item2.png', year: 2024, theme: false, effect: false }
 ];
 
-let filter = 'all';
+let typeFilter = 'all';
+let yearFilter = 'all';
 
+/* 保存 */
 function save() {
   localStorage.setItem('collection', JSON.stringify(data));
 }
@@ -174,19 +164,27 @@ function load() {
   }
 }
 
-function checkUpdate() {
-  const saved = localStorage.getItem('collection');
-  if (!saved) return;
+/* 年度ボタン生成 */
+function createYearFilter() {
+  const container = document.getElementById('yearFilter');
+  container.innerHTML = '';
 
-  const old = JSON.parse(saved);
-  if (data.length > old.length) {
-    const notice = document.getElementById('notice');
-    notice.style.display = 'block';
-    notice.textContent = `新規追加: ${data.length - old.length}件`;
-  }
+  const years = [...new Set(data.map(d => d.year))];
+
+  const allBtn = document.createElement('button');
+  allBtn.textContent = 'すべて';
+  allBtn.onclick = () => setYearFilter('all');
+  container.appendChild(allBtn);
+
+  years.forEach(y => {
+    const btn = document.createElement('button');
+    btn.textContent = y;
+    btn.onclick = () => setYearFilter(y);
+    container.appendChild(btn);
+  });
 }
 
-/* 描画（ソートなし版） */
+/* 描画 */
 function render() {
   const list = document.getElementById('list');
   list.innerHTML = '';
@@ -198,8 +196,10 @@ function render() {
     if (item.theme) themeDone++;
     if (item.effect) effectDone++;
 
-    if (filter === 'theme' && item.theme) return;
-    if (filter === 'effect' && item.effect) return;
+    if (typeFilter === 'theme' && item.theme) return;
+    if (typeFilter === 'effect' && item.effect) return;
+
+    if (yearFilter !== 'all' && item.year !== yearFilter) return;
 
     const div = document.createElement('div');
     div.className = 'item';
@@ -207,6 +207,7 @@ function render() {
     div.innerHTML = `
       <img src="${item.img}">
       <div>${item.name}</div>
+      <div>${item.year}</div>
       <button class="btn ${item.theme ? 'got' : ''}">テーマ</button>
       <button class="btn ${item.effect ? 'got' : ''}">エフェクト</button>
     `;
@@ -237,15 +238,22 @@ function updateBar(type, done) {
   const percent = Math.floor(done / total * 100);
 
   document.getElementById('bar_' + type).style.width = percent + '%';
-  document.getElementById('text_' + type').textContent =
+  document.getElementById('text_' + type).textContent =
     `${done}/${total} (${percent}%)`;
 }
 
-function setFilter(f) {
-  filter = f;
+/* フィルター */
+function setTypeFilter(f) {
+  typeFilter = f;
   render();
 }
 
+function setYearFilter(y) {
+  yearFilter = y;
+  render();
+}
+
+/* 未取得 */
 function showMissing(type) {
   const list = document.getElementById('missingList');
   list.innerHTML = '';
@@ -265,10 +273,6 @@ function showMissing(type) {
     }
   });
 
-  if (!list.innerHTML) {
-    list.innerHTML = '<li>全部取得済み！🎉</li>';
-  }
-
   document.getElementById('modal').classList.remove('hidden');
 }
 
@@ -276,8 +280,9 @@ function closeModal() {
   document.getElementById('modal').classList.add('hidden');
 }
 
+/* 初期化 */
 load();
-checkUpdate();
+createYearFilter();
 render();
 </script>
 
