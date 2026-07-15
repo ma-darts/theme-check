@@ -13,17 +13,31 @@ body {
 /* フィルター */
 .filter button {
   margin: 3px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #ddd;
+  cursor: pointer;
 }
 
-/* 進捗バー */
+.filter button.active {
+  background: #4caf50;
+  color: #fff;
+}
+
+/* タイトル＋バー横並び */
+.section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .progress {
   position: relative;
-  height: 16px;
+  height: 14px;
   background: #eee;
-  margin: 15px auto;
   width: 50%;
-  max-width: 300px;
-  cursor: pointer;
+  max-width: 200px;
 }
 
 .bar {
@@ -36,26 +50,32 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 /* グリッド */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
 }
 
+/* カード */
 .item {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 6px;
   text-align: center;
   font-size: 12px;
+  background: #fafafa;
 }
 
 .item img {
   width: 100%;
+  border-radius: 6px;
 }
 
-/* ボタン（縦並び最適化） */
+/* ボタン */
 .btn-group {
   display: flex;
   flex-direction: column;
@@ -64,11 +84,9 @@ body {
 }
 
 .btn {
-  width: 100%;
   padding: 10px 0;
-  font-size: 13px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #ddd;
   cursor: pointer;
 }
@@ -89,7 +107,7 @@ body {
 <h2>テーマ・エフェクト管理</h2>
 
 <!-- 種類フィルター -->
-<div class="filter">
+<div class="filter" id="typeFilter">
   <button onclick="setType('all')">全体</button>
   <button onclick="setType('theme')">テーマ(Live2)</button>
   <button onclick="setType('effect')">エフェクト(Live3)</button>
@@ -98,16 +116,22 @@ body {
 <!-- 年度フィルター -->
 <div class="filter" id="yearFilter"></div>
 
-<h3>テーマ</h3>
-<div class="progress" onclick="showMissing('theme')">
-  <div class="bar" id="bar_theme"></div>
-  <span id="text_theme"></span>
+<!-- テーマ -->
+<div class="section">
+  <h3>テーマ</h3>
+  <div class="progress">
+    <div class="bar" id="bar_theme"></div>
+    <span id="text_theme"></span>
+  </div>
 </div>
 
-<h3>エフェクト</h3>
-<div class="progress" onclick="showMissing('effect')">
-  <div class="bar" id="bar_effect"></div>
-  <span id="text_effect"></span>
+<!-- エフェクト -->
+<div class="section">
+  <h3>エフェクト</h3>
+  <div class="progress">
+    <div class="bar" id="bar_effect"></div>
+    <span id="text_effect"></span>
+  </div>
 </div>
 
 <div class="grid" id="list"></div>
@@ -118,11 +142,10 @@ const data = [
   { name: 'item2', img: 'item2.png', year: 2024, theme: false, effect: false }
 ];
 
-/* フィルター状態 */
 let selectedType = 'all';
 let selectedYear = 'all';
 
-/* 年度フィルター生成 */
+/* 年度フィルター */
 function createYearFilter() {
   const el = document.getElementById('yearFilter');
   el.innerHTML = '';
@@ -142,6 +165,29 @@ function createYearFilter() {
   });
 }
 
+/* フィルター色更新 */
+function updateFilterUI() {
+  document.querySelectorAll('#typeFilter button').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  document.querySelectorAll('#yearFilter button').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  const typeBtns = document.querySelectorAll('#typeFilter button');
+  if (selectedType === 'all') typeBtns[0].classList.add('active');
+  if (selectedType === 'theme') typeBtns[1].classList.add('active');
+  if (selectedType === 'effect') typeBtns[2].classList.add('active');
+
+  const yearBtns = document.querySelectorAll('#yearFilter button');
+  yearBtns.forEach(btn => {
+    if (btn.textContent == selectedYear || (selectedYear === 'all' && btn.textContent === 'すべて')) {
+      btn.classList.add('active');
+    }
+  });
+}
+
 /* 描画 */
 function render() {
   const list = document.getElementById('list');
@@ -155,7 +201,6 @@ function render() {
     if (item.theme) themeDone++;
     if (item.effect) effectDone++;
 
-    /* ANDフィルター */
     if (selectedType === 'theme' && item.theme) return;
     if (selectedType === 'effect' && item.effect) return;
 
@@ -192,16 +237,17 @@ function render() {
 
   updateBar('theme', themeDone);
   updateBar('effect', effectDone);
+  updateFilterUI();
 }
 
-/* 進捗バー */
+/* バー */
 function updateBar(type, done) {
   const total = data.length;
   const percent = Math.floor(done / total * 100);
 
   document.getElementById('bar_' + type).style.width = percent + '%';
   document.getElementById('text_' + type).textContent =
-    `${done}/${total} (${percent}%)`;
+    `${done}/${total}`;
 }
 
 /* フィルター操作 */
@@ -213,12 +259,6 @@ function setType(t) {
 function setYear(y) {
   selectedYear = y;
   render();
-}
-
-/* 未取得一覧 */
-function showMissing(type) {
-  const missing = data.filter(d => !d[type]);
-  alert(missing.map(m => m.name).join('\\n') || '全部取得済み！');
 }
 
 /* 初期化 */
